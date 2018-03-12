@@ -10,12 +10,11 @@
     </q-layout-header>
 
     <q-page-container>
-      <router-view />
-    </q-page-container>
-
-     <q-layout-footer :reveal="true">
+      <transition appear enter-active-class="animated slideInUp">
+        <router-view />
+      </transition>
       <div class="customFooter"></div>
-    </q-layout-footer>
+    </q-page-container>
   </q-layout>
 </template>
 
@@ -39,9 +38,10 @@ export default {
 </script>
 
 <style>
-.customFooter {
-  width: 100vw;
-  height: 5vh;
-  background-color: black;
-}
+  .customFooter {
+    width: 100vw;
+    height: 5vh;
+    background-color: #212121;
+    position:relative;
+  }
 </style>

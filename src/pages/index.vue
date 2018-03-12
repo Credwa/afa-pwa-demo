@@ -1,31 +1,46 @@
 <template>
-  <q-page class="column items-center" style="top: 10vh">
+  <q-page class="column items-center" style="top: 5vh">
     <!-- <p class="caption">Search Customer</p> -->
     <div class="row" style="z-index:10">
       <q-search float-label="Search Customer" style="right: 10%; width: 60vw"
       v-model="search" clearable
       >
-    <q-popover style="width: 60vw">
+    <q-popover style="width: 60vw" max-height="30vh">
     <!--
       The DOM element(s) that make up the popup,
       in this case a list:
     -->
     <q-list separator link>
       <!-- notice `v-close-overlay` which closes popover -->
-      <q-item v-for="customer in filteredCustomers" :key="customer.name + customer.address"  @click.native="search = customer.name">
-        {{customer.name}}
+      <q-item  v-close-overlay v-for="customer in customers" :key="customer.CustomerId"  @click.native="search = customer.CustomerName" color="blue">
+        {{customer.CustomerName}}
       </q-item>
     </q-list>
   </q-popover >
       </q-search>
-      <q-btn color="primary" @click="getCustomerData">View</q-btn>
+      <q-btn color="primary" style="max-height:5vh; margin-top:2vh" @click="getCustomerData" :loading="viewLoading">View
+        <q-spinner-facebook slot="loading" />
+      </q-btn>
     </div>
-  <customer :customerData = "customerClicked"> </customer>
+  <customer :customerData = "customerData"> </customer>
+
   </q-page>
 </template>
 
 <script>
-import { QSearch, QBtn, QField, QInput, QPopover, QList, QItem } from 'quasar';
+import {
+  QSearch,
+  QBtn,
+  QField,
+  QInput,
+  QPopover,
+  QList,
+  QItem,
+  CloseOverlay,
+  QSpinnerFacebook,
+} from 'quasar';
+import axios from 'axios';
+import _ from 'lodash';
 
 import Customer from './../components/Customer';
 
@@ -39,56 +54,86 @@ export default {
     QPopover,
     QList,
     QItem,
+    QSpinnerFacebook,
+  },
+  directives: {
+    CloseOverlay,
   },
   name: 'PageIndex',
   data() {
     return {
       search: '',
-      showPopover: true,
-      customers: [
-        {
-          name: 'Craig Edwards',
-          address: '5512 111th st',
-          apartment: '3D',
-          city: 'Flushing',
-          state: 'NY',
-          zip: '11368',
-          notes: '',
+      customers: null,
+      viewLoading: false,
+      customerData: {
+        CustomerName: '',
+        CustomerBillPrimary: {
+          Address1: '',
+          Address2: '',
+          City: '',
+          State: '',
+          Zip: '',
         },
-        {
-          name: 'App Tester',
-          address: '54.164.87.50',
-          apartment: 'ec2',
-          city: 'aws',
-          state: 'amazon',
-          zip: '01010',
-          notes: 'This is a test note',
-        },
-      ],
-      customerClicked: {},
+      },
     };
   },
   methods: {
     getCustomerData() {
+      this.viewLoading = true;
+      setTimeout(() => {
+        this.viewLoading = false;
+      }, 3000);
       let foundCustomer = null;
-      const tempArr = this.customers.filter(customer => customer.name === this.search);
-
+      const tempArr = this.customers.filter(
+        customer => customer.CustomerName === this.search,
+      );
       foundCustomer = tempArr[0];
-      this.customerClicked = foundCustomer;
+      const vm = this;
+      axios
+        .get(
+          `https://sedonaapibeta.afap.com/api/customer/${
+            foundCustomer.CustomerId
+          }`,
+        )
+        .then((res) => {
+          vm.customerData = res.data;
+          setTimeout(() => {
+            this.viewLoading = false;
+          }, 500);
+        })
+        .catch((e) => {
+          console.log(e);
+          this.$q.notify({
+            color: 'negative',
+            textColor: 'white',
+            icon: 'warning',
+            message: 'Can\'t get customer data',
+            position: 'bottom',
+            timeout: 3000,
+          });
+        });
     },
+    getSearchResults: _.debounce((newSearch, vm) => {
+      axios
+        .get(
+          `https://sedonaapibeta.afap.com/api/customer?$filter=contains(CustomerName, '${newSearch}')&$select=CustomerName,CustomerId&$top=25`,
+        )
+        .then((res) => {
+          vm.customers = res.data;
+        })
+        .catch((e) => {
+          vm.customers = [{ CustomerName: 'Not Found' }];
+        });
+    }, 500),
   },
-  computed: {
-    filteredCustomers() {
-      let tempCustomers = [];
-      if (this.search.length > 0) {
-        const reg = new RegExp(`${this.search.toUpperCase()}`);
-        tempCustomers = this.customers.filter(
-          customer => !customer.name.toUpperCase().search(reg),
-        );
+  watch: {
+    search(newSearch) {
+      if (newSearch.length > 3) {
+        this.getSearchResults(newSearch.trim(), this);
       }
-      return tempCustomers;
     },
   },
+  computed: {},
 };
 </script>
 
